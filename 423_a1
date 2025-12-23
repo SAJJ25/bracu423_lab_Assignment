@@ -1,0 +1,324 @@
+from OpenGL.GL import *
+from OpenGL.GLUT import *
+from OpenGL.GLU import *
+import random
+import math
+
+raindrops = []
+RAIN_COUNT = 150
+rain_angle = 0 
+RAIN_SPEED = 5
+MAX_ANGLE = 45 
+W_Width, W_Height = 700,600
+
+sky_brightness = 0.7 
+transition_speed = 0.05
+ball_size = 1 
+
+def init_raindrops():
+    global raindrops
+    for _ in range(RAIN_COUNT):
+        x = random.randint(-350, 350)
+        y = random.randint(100, 400)
+        raindrops.append([x, y])
+
+def crossProduct(a, b):
+    result=point()
+    result.x = a.y * b.z - a.z * b.y
+    result.y = a.z * b.x - a.x * b.z
+    result.z = a.x * b.y - a.y * b.x
+    return result
+
+def convert_coordinate(x,y):
+    global W_Width, W_Height
+    a = x - (W_Width/2)
+    b = (W_Height/2) - y 
+    return a,b
+
+def draw_points(x, y, s):
+    glPointSize(s) #pixel size. by default 1 thake
+    glBegin(GL_POINTS)
+    glVertex2f(x,y) #jekhane show korbe pixel
+    glEnd()
+
+def drawAxes():
+    glLineWidth(1)
+    glBegin(GL_LINES)
+    glColor3f(1.0, 0.0, 0.0)
+    glVertex2f(250,0)
+    glVertex2f(-250,0)
+    glColor3f(0.0, 0.0, 1.0)
+    glVertex2f(0,250)
+    glVertex2f(0,-250)
+    glEnd()
+    glPointSize(5)
+
+def draw_sky():
+    global sky_brightness
+    
+    
+    day_color = [0.53, 0.81, 0.98] 
+   
+    night_color = [0.1, 0.1, 0.2] 
+    
+    sky_r = night_color[0] + (day_color[0] - night_color[0]) * sky_brightness
+    sky_g = night_color[1] + (day_color[1] - night_color[1]) * sky_brightness
+    sky_b = night_color[2] + (day_color[2] - night_color[2]) * sky_brightness
+    
+    glBegin(GL_QUADS)
+    glColor3f(sky_r, sky_g, sky_b)
+    glVertex2d(-350, 90)  
+    glVertex2d(350, 90)  
+    glVertex2d(350, 350)  
+    glVertex2d(-350, 350)  
+    glEnd()
+
+def draw_shape():
+    global sky_brightness
+    house_brightness = 0.85 + sky_brightness * 0.05
+    
+    glBegin(GL_QUADS)
+    glColor3f(1.0 * house_brightness, 0.9804 * house_brightness, 0.9216 * house_brightness)
+    glVertex2d(-90,40)
+    glVertex2d(90,40)
+    glVertex2d(90,-40)
+    glVertex2d(-90,-40)
+    glEnd()
+
+def drawShapes():
+    global sky_brightness
+    ground_brightness = 0.4706 + sky_brightness * 0.05 
+    glBegin(GL_QUADS)
+    glColor3f(0.4706, 0.2824, 0.0)
+    glVertex2d(-350,-350)
+    glVertex2d(350,-350)
+    glVertex2d(350,90)
+    glVertex2d(-350,90)
+    glEnd()
+
+def keyboardListener(key, x, y):
+    global ball_size, sky_brightness, transition_speed
+    
+    if key==b'w':
+        ball_size+=1
+        print("Size Increased")
+    if key==b's':
+        ball_size-=1
+        print("Size Decreased")
+    
+   
+    if key==b'd': 
+        sky_brightness = min(1.0, sky_brightness + transition_speed)
+        print(f"Transitioning to day... Sky brightness: {sky_brightness:.2f}")
+    if key==b'n':
+        sky_brightness = max(0.0, sky_brightness - transition_speed)
+        print(f"Transitioning to night... Sky brightness: {sky_brightness:.2f}")
+    
+    glutPostRedisplay()
+
+def specialKeyListener(key, x, y):
+    global rain_angle
+
+    if key == GLUT_KEY_LEFT:
+        rain_angle = min(MAX_ANGLE, rain_angle + 5)
+    elif key == GLUT_KEY_RIGHT:
+        rain_angle = max(-MAX_ANGLE, rain_angle - 5)
+
+    print(f"Rain angle changed to: {rain_angle}°")
+    glutPostRedisplay()
+
+def mouseListener(button, state, x, y):
+    global ballx, bally, create_new
+    if button==GLUT_LEFT_BUTTON:
+        if(state == GLUT_DOWN):
+            print(x,y)
+            c_X, c_y = convert_coordinate(x,y)
+            ballx, bally = c_X, c_y
+        
+    if button==GLUT_RIGHT_BUTTON:
+        if state == GLUT_DOWN: 	
+            create_new = convert_coordinate(x,y)
+    
+    glutPostRedisplay()
+
+def draw_rain():
+    global sky_brightness
+    
+    glBegin(GL_LINES)
+    blue_count = int(RAIN_COUNT * 0.6)
+    
+   
+    if sky_brightness > 0.5:  
+        glColor3f(0.2, 0.4, 0.8) 
+    else: # Night time
+        glColor3f(0.4, 0.6, 1.0) 
+    
+    angle_rad = math.radians(rain_angle)
+    dx = math.sin(angle_rad) * 30
+    dy = math.cos(angle_rad) * 30
+    
+    for i in range(blue_count):
+        x, y = raindrops[i]
+        glVertex2f(x, y)
+        glVertex2f(x - dx, y - dy)
+    
+    
+    if sky_brightness > 0.5:  
+        glColor3f(0.3, 0.5, 0.9)  
+    else: 
+        glColor3f(0.8, 0.8, 1.0) 
+    
+    for i in range(blue_count, RAIN_COUNT):
+        x, y = raindrops[i]
+        glVertex2f(x, y)
+        glVertex2f(x - dx, y - dy)
+    
+    glEnd()
+
+def display():
+    global sky_brightness
+    
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glClearColor(0,0,0,0)
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glMatrixMode(GL_MODELVIEW)
+    glLoadIdentity()
+    gluLookAt(0,0,200,	0,0,0,	0,1,0)
+    glMatrixMode(GL_MODELVIEW)
+
+    draw_sky()
+ 
+    drawShapes()
+    
+    draw_bush_row(-250,35)
+    
+    draw_shape()
+    
+    roof_brightness = 0.9 + sky_brightness * 0.05 
+    glBegin(GL_TRIANGLES)
+    glColor3f(0.3294 * roof_brightness, 0.0, 1.0 * roof_brightness) 
+    glVertex2d(-100, 40)   
+    glVertex2d(100, 40)     
+    glVertex2d(0, 100)        
+    glEnd()
+    
+    
+    door_brightness = 0.9 + sky_brightness * 0.05 
+    glBegin(GL_QUADS)
+    glColor3f(0.3882 * door_brightness, 0.6843 * door_brightness, 1.0 * door_brightness)
+    glVertex2d(-17,20)
+    glVertex2d(17,20)
+    glVertex2d(17,-40)
+    glVertex2d(-17,-40)
+    glEnd()
+
+ 
+    glColor3f(0.2, 0.2, 0.2) 
+    draw_points(5, -10, 6)
+
+    
+    glBegin(GL_QUADS)
+    glColor3f(0.3882 * door_brightness, 0.6843 * door_brightness, 1.0 * door_brightness)
+    glVertex2d(-63,23)
+    glVertex2d(-29,23)
+    glVertex2d(-29,-10)
+    glVertex2d(-63,-10)
+    glEnd()
+
+   
+    glBegin(GL_QUADS)
+    glColor3f(0.3882 * door_brightness, 0.6843 * door_brightness, 1.0 * door_brightness)
+    glVertex2d(29,23)
+    glVertex2d(63,23)
+    glVertex2d(63,-10)
+    glVertex2d(29,-10)
+    glEnd()
+
+   
+    glBegin(GL_LINES)
+    glColor3f(0.0, 0.0, 0.0)
+    glVertex2d(-46,23)
+    glVertex2d(-46,-10)
+    glVertex2d(-63,6.5)
+    glVertex2d(-29,6.5)
+    glEnd()
+
+    glBegin(GL_LINES)
+    glColor3f(0.0, 0.0, 0.0)
+    glVertex2d(29,6.5)
+    glVertex2d(63,6.5)
+    glVertex2d(46,23)
+    glVertex2d(46,-10)
+    glEnd()
+    
+    # Draw rain
+    draw_rain()
+    glutSwapBuffers()
+
+def draw_bush_row(start_x, base_y, triangle_width=26, triangle_height=45, count=20):
+    global sky_brightness
+
+    bush_brightness = 0.9 + sky_brightness * 0.05  
+    
+    for i in range(count):
+        x = start_x + i * triangle_width
+        base_left = x
+        base_right = x + triangle_width
+        top_x = (base_left + base_right) / 2
+        top_y = base_y + triangle_height
+
+        glBegin(GL_TRIANGLES)
+        glColor4f(0.0, 1.0 * bush_brightness, 0.0, 1.0) 
+        glVertex2f(base_left, base_y)      
+        glVertex2f(base_right, base_y)     
+        glColor4f(0.0, 0.8 * bush_brightness, 0.0, 0.0)  
+        glVertex2f(top_x, top_y)        
+        glEnd()
+
+def animate():
+    global raindrops, rain_angle
+
+    angle_rad = math.radians(rain_angle)
+    dx = math.sin(angle_rad) * RAIN_SPEED
+    dy = math.cos(angle_rad) * RAIN_SPEED
+
+    for drop in raindrops:
+        drop[0] += dx
+        drop[1] -= dy
+
+        if drop[1] < -350 or drop[0] < -400 or drop[0] > 400:
+            drop[1] = random.randint(300, 400)
+            drop[0] = random.randint(-350, 350)
+
+    glutPostRedisplay()
+
+def init():
+    glClearColor(0,0,0,0)
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity()
+    gluPerspective(104,	1,	1,	1000.0)
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) 
+    init_raindrops()
+
+glutInit()
+glutInitWindowSize(W_Width, W_Height)
+glutInitWindowPosition(0, 0)
+glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGB)
+
+wind = glutCreateWindow(b"OpenGL Rain Scene with Day/Night Cycle")
+init()
+
+glutDisplayFunc(display)
+glutIdleFunc(animate)
+glutKeyboardFunc(keyboardListener)
+glutSpecialFunc(specialKeyListener)
+glutMouseFunc(mouseListener)
+
+print("Controls:")
+print("- Arrow keys: Change rain angle")
+print("- 'd' key: Transition to day (brighten sky)")
+print("- 'n' key: Transition to night (darken sky)")
+print("- 'w'/'s': Adjust ball size")
+
+glutMainLoop()
